@@ -34,6 +34,8 @@ class PushProject:
 
         print ("issue git command to push changes to server")
         os.system(r'git push')
+        user_name = input()
+        password = input()
 
         print ("issue git command to print status")
         os.system(r'git status')

@@ -69,7 +69,7 @@ class OrgPhotosGUI(Frame):
             self.dest_l.insert(0,'%s'%folder_path)
             self.dest_l.config(bg='green', fg='white')
     
-    def call_organize(self, dest=False):
+    def call_organize(self, dest=True):
         if dest == False:
             self.destination_folder = ''
         if not self._validate_folder(dest=dest): return
@@ -77,7 +77,7 @@ class OrgPhotosGUI(Frame):
         self._startSocket()
         self._updatetext('Spawn non GUI script\n')
         cmd = 'orgpics.pyw %s %s -g'%(self.source_folder, self.destination_folder)
-        PortableLauncher('Organize', cmd)()  # spawn non-GUI script 
+        PortableLauncher('Organize %s %s'%(self.source_folder, self.destination_folder), cmd)()  # spawn non-GUI script 
 
         self._updatetext('accepting\n')
         self.conn, self.addr = self.sockobj.accept()                # wait for client to connect

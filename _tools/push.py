@@ -52,7 +52,10 @@ class PushProject:
         
 if __name__ == '__main__':
     pp = PushProject()
-    pp.clean_files()
+    try:
+        pp.clean_files()
+    except:
+        pass
     pp.get_git()
     
 

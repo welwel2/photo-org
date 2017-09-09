@@ -9,11 +9,14 @@ from socket_stream_redirect0 import redirectOut        # connect my sys.stdout t
 class OrgPics:
     organize = True
     fhashs = []
-    def __init__(self, input_f, output_f='', redirect = False):
+    def __init__(self, input_f, output_f='', redirect = False, queue=None, data=None):
         self.starttime = time.time()
         self.input_f = input_f
         self.output_f = output_f
         self.redirect = redirect
+        self.queue = queue
+        self.data = data
+        
         if output_f == '':
             self.organize = False
             self.duplicates = os.path.join(input_f, 'duplicates')
@@ -25,12 +28,16 @@ class OrgPics:
         if self.organize and not os.path.exists(output_f):
             # path does not exist, create a new folder
             os.mkdir(output_f)
+#        self.run()
+        
+    def __call__(self):
         self.run()
         
     def run(self):
         rmlist = []
         file_counter = 0
         flist = []
+        self.prnt('starting orgpics process\ninput folder %s\n'%self.input_f)            
         for (dirname, subshere, fileshere) in os.walk(self.input_f):
             for fname in fileshere:
                 if fname[-3:] in ('jpg', 'JPG'):
@@ -39,20 +46,36 @@ class OrgPics:
             if not os.path.getsize(dirname):
                 rmlist.append(dirname)
         self.rm_empty_folders(rmlist)
-        self.callmulti_process2(flist)
-        print('%d files processed in %d seconds'%(file_counter, time.time()- self.starttime))            
-        
+        self.callmulti_process3(flist)
+        self.prnt('%d files processed in %d seconds\n'%(file_counter, time.time()- self.starttime))
+           
+    def prnt(self, msg):
+       if self.queue:
+           self.queue.put(msg)
+       elif self.data:
+           if 'msg' in self.data:
+               self.data['msg'].append(msg)
+           else:
+               self.data['msg'] = [msg]
+       else:
+           print(msg)
+    
     def rm_empty_folders(self, rmlist):
         # remove empty folders
         map(os.rmdir, rmlist)
-       # for folder in rmlist:
-       #     print('removing empty folder %s' %folder)
-       #     try:
-       #         os.rmdir(folder)
-       #     except:
-       #         print('failed to remove folder %s'%folder)
-       #         pass
         
+    def callmulti_process3(self, flist):
+        MAX_POOL = cpu_count() * 2
+        files = len(flist)
+        if files < MAX_POOL:
+            MAX_POOL = files
+        self.prnt('Pool size is %d\n' %MAX_POOL)
+        with Pool(MAX_POOL) as p:
+            
+            results = [p.apply_async(self.processfile, (f,), callback=self.prnt) for f in flist]
+            for r in results:
+                r.wait()
+
     def callmulti_process2(self, flist):
         MAX_POOL = cpu_count() * 2
         result = []
@@ -61,29 +84,29 @@ class OrgPics:
             MAX_POOL = files
         P = Pool(MAX_POOL)
         P.map(self.processfile, flist)
+        P.close()
+        P.join()
         
-    #def callmulti_process(self, flist):
-    #    lock = Lock()
-    #    files = len(flist)
-    #    while len(flist):
-    #        print ('number of files to process %d' %len(flist))
-    #        if len(flist) > 10:
-    #            processes = 10
-    #        else:
-    #            processes = len(flist)
-    #
-    #        for i in range(processes):
-    #            print ('processes %d %d file %s' %(processes, i, flist[0]))
-    #            Process(target=self.processfile, args=(('run process %d' % i),
-    #                                                    flist[0], lock)).start()
-    #            flist.pop(0)
+    def callmulti_process(self, flist):
+        MAX_POOL = 16
+        lock = Lock()
+        files = len(flist)
+        while len(flist):
+            print ('number of files to process %d\n' %len(flist))
+            if len(flist) > MAX_POOL:
+                processes = MAX_POOL
+            else:
+                processes = len(flist)
+    
+            for i in range(processes):
+                print ('processes %d %d file %s' %(processes, i, flist[0]))
+                Process(target=self.processfile, args=(('run process %d' % i),
+                                                        flist[0], lock)).start()
+                flist.pop(0)
         
     def processfile(self, file):
-        msg = 'pid:%s, processing file:%s'
         self.file_path = file
-       # if self.redirect:
-       #     redirectOut()     # GUI must be started first as is
-        print(msg % ( os.getpid(), self.file_path))
+        msg = 'pid:%s, processing file:%s\n'% ( os.getpid(), self.file_path)
         self.checkDuplicates()
 
         if self.organize:
@@ -92,7 +115,8 @@ class OrgPics:
 
             # move file to new location
             self.moveFile()
-        
+        return msg
+    
     def extractOriginalDate(self):
         # open image file for reading (binary mode)
         fh = open(self.file_path, 'rb')
@@ -106,7 +130,7 @@ class OrgPics:
             try:
                 dto = tags['Image DateTime']
             except KeyError:
-                print('Photo has no date found')
+#                self.prnt('Photo has no date found')
                 self.new_location = self.dateless
                 return
                 
@@ -116,7 +140,7 @@ class OrgPics:
         day = dto.__str__()[8:10]
         
         self.new_location = os.path.join(self.output_f, '%s-%s-%s' %(year, month, day))
-        print ("Photo Original Date: %s-%s-%s\n" %(year, month, day))
+ #       self.prnt ("Photo Original Date: %s-%s-%s\n" %(year, month, day))
     
     def checkDuplicates(self):
         fhash = self.hashi()
@@ -140,7 +164,7 @@ class OrgPics:
         npl = os.path.join(folder, self.fname)
         
         if os.path.exists(npl):
-            print('Photo exists in new folder, skipping..')
+#            self.prnt('Photo exists in new folder, skipping..')
             return
         
         os.rename(self.file_path, npl)
@@ -168,4 +192,5 @@ if __name__ == '__main__':
         op = OrgPics(input_f=sys.argv[1], redirect=redirect)
     else:
         op = OrgPics(input_f=default_path, redirect=redirect)
+        op.run()
         

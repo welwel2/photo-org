@@ -5,7 +5,10 @@ from tkinter.filedialog import *
 from socket import *                         # including socket.error 
 from tkinter.scrolledtext import ScrolledText
 from launchmodes import PortableLauncher
-import time
+from multiprocessing import *
+from threading import *
+import time, queue
+from orgpics import OrgPics
 
 
 class OrgPhotosGUI(Frame):
@@ -16,6 +19,8 @@ class OrgPhotosGUI(Frame):
     msg3 = 'Photo Organizer rev %s' %rev
     source_folder = 'NA'
     destination_folder = 'NA'
+    sockets = False
+    process = False
     
     def __init__(self, parent=None):
         Frame.__init__(self, parent)
@@ -49,15 +54,30 @@ class OrgPhotosGUI(Frame):
         
     def checkdata(self):
         # check data from spawned non gui program
+#        while(self.p.is_alive()):
+        secsSinceEpoch = time.time()
+        elapsedtime = secsSinceEpoch - self.pstart
         try:
-            message = self.conn.recv(1024)            # don't block for input
-            if(message):
-                self._updatetext(message)
-        except error:                            # raises socket.error if not ready
-            pass
-#            self._updatetext('no data..\n')                     
-        self.after(500, self.checkdata)              # check once per second
-        
+            if self.sockets:
+                message = self.conn.recv(1024)            # don't block for input
+#            elif self.q and not self.q.empty():
+#                message = self.q.get()
+            elif 'msg' in self.d:
+                message = self.d['msg']
+                if(message):
+                    self._updatetext(message)
+                    self.d['msg'] = ['']
+        except:                            # raises socket.error if not ready
+            self._updatetext('e')
+        self.log_st2.config(text='Process is running %3d seconds' %elapsedtime)
+        if self.p.is_alive():
+            self.after(1000, self.checkdata)              # check once per second
+#            self._updatetext('=')
+        else:
+            self.log_st2.config(text='Process completed in %3d seconds' %elapsedtime)
+            self._updatetext('\nprocess done\n')
+            
+            
     def get_folder(self, src_dest):
         folder_path = askdirectory()
         if not folder_path: return
@@ -72,20 +92,38 @@ class OrgPhotosGUI(Frame):
     def call_organize(self, dest=False):
         if dest == False:
             self.destination_folder = ''
+            task = "clean"
+        else:
+            task = 'organize'
         if not self._validate_folder(dest=dest): return
         self._updatetext(self.msg2)
-        self._startSocket()
-        self._updatetext('Spawn non GUI script\n')
-        cmd = 'orgpics.pyw %s %s -g'%(self.source_folder, self.destination_folder)
-        PortableLauncher('Organize', cmd)()  # spawn non-GUI script 
-
-        self._updatetext('accepting\n')
-        self.conn, self.addr = self.sockobj.accept()                # wait for client to connect
-        self._updatetext('accepted\n')
-        self.conn.setblocking(False)                           # use nonblocking socket (False=0)
-
+        if self.sockets:
+            self._startSocket()
+            self._updatetext('Spawn non GUI script\n')
+            cmd = 'orgpics.pyw %s %s -g'%(self.source_folder, self.destination_folder)
+            PortableLauncher('%s'%task, cmd)()  # spawn non-GUI script 
+    
+            self._updatetext('accepting\n')
+            self.conn, self.addr = self.sockobj.accept()                # wait for client to connect
+            self._updatetext('accepted\n')
+            self.conn.setblocking(False)                           # use nonblocking socket (False=0)
+        else:
+            if self.process:
+               self.q = Queue()
+            else:
+                self.d = dict()
+                self.d['caller'] = 'gui'
+#                self.q = queue.Queue()
+            op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d)
+            #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
+            self.pstart = time.time()
+            if self.process:
+                self.p = Process(target=op)
+            else:
+                self.p = Thread(target=op, name='orgpics')
+            self.p.start()
         self.checkdata()
-            
+        
     def _validate_folder(self, src=True, dest=True):
         folder_list = [('source', self.source_l), ('desinantion', self.dest_l)]
         if dest == False:
@@ -161,7 +199,7 @@ class OrgPhotosGUI(Frame):
         b_frame = Frame(self, bg='red')
         self.log_st1 = Label(b_frame, relief="ridge", bg='purple', width=25, fg='white')
         self.log_st1.pack(side=LEFT)
-        self.log_st2 = Label(b_frame, relief="sunken", bg='blue', width=50)
+        self.log_st2 = Label(b_frame, relief="sunken", bg='blue', width=50, fg='white')
         self.log_st2.pack(side=LEFT, fill=X,expand=Y)
         self.log_st3 = Label(b_frame, relief="ridge", bg='purple', width=25, fg='white')
         self.log_st3.pack(side=LEFT)

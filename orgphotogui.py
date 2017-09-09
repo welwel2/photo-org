@@ -89,7 +89,7 @@ class OrgPhotosGUI(Frame):
             self.dest_l.insert(0,'%s'%folder_path)
             self.dest_l.config(bg='green', fg='white')
     
-    def call_organize(self, dest=False):
+    def call_organize(self, dest=True):
         if dest == False:
             self.destination_folder = ''
             task = "clean"

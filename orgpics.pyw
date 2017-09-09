@@ -161,7 +161,7 @@ class OrgPics:
         if not os.path.exists(folder):
             # path does not exist, create a new folder
             os.mkdir(folder)
-        npl = os.path.join(folder, self.fname)
+        npl = os.path.join(folder, os.path.basename(self.file_path))
         
         if os.path.exists(npl):
 #            self.prnt('Photo exists in new folder, skipping..')
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     import sys
     args = len(sys.argv)
     redirect = False
-    default_path = r'C:\Users\220554\orgphotos'
+    default_path = r'C:\Users\juju\Pictures'
     print('sys.argv ', sys.argv, 'args ', args)
     
     if '-g' in sys.argv[-1]:                          # link to gui only if requested

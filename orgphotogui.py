@@ -38,25 +38,29 @@ class OrgPhotosGUI(Frame):
         self.sockobj.bind(('', myport))                   # config server before client
         self.sockobj.listen(5)
         
-    def onTimer(self):
+    def getElapsedtime(self, start):
         secsSinceEpoch = time.time()
-        elapsedtime = secsSinceEpoch - self.starttime
+        elapsedtime = secsSinceEpoch - start
         elapsedsec = elapsedtime % 60      # extract seconds
         elapsedminh = elapsedtime // 60
         elapsedhrs = elapsedminh  // 60    # extract hours
         elapsedmin = elapsedminh % 60      # extract minutes
 
+        timestr = 'time %d:%d:%d'%(elapsedhrs, elapsedmin, elapsedsec)
+
+        return timestr
+    def onTimer(self):
+        elapsed = self.getElapsedtime(self.starttime)
         # update status Bar
-        self.log_st1.config(text=time.ctime(secsSinceEpoch))
-        self.log_st3.config(text='session time %d:%d:%d'%(elapsedhrs, elapsedmin, elapsedsec))
+        self.log_st1.config(text=time.ctime(time.time()))
+        self.log_st3.config(text=elapsed)
         
         self.after(1000 // 1, self.onTimer)  # run N times per second
         
     def checkdata(self):
         # check data from spawned non gui program
 #        while(self.p.is_alive()):
-        secsSinceEpoch = time.time()
-        elapsedtime = secsSinceEpoch - self.pstart
+        elapsed = self.getElapsedtime(self.pstart)
         try:
             if self.sockets:
                 message = self.conn.recv(1024)            # don't block for input
@@ -69,12 +73,12 @@ class OrgPhotosGUI(Frame):
                     self.d['msg'] = ['']
         except:                            # raises socket.error if not ready
             self._updatetext('e')
-        self.log_st2.config(text='Process is running %3d seconds' %elapsedtime)
+        self.log_st2.config(text='Process running %s' %elapsed)
         if self.p.is_alive():
             self.after(1000, self.checkdata)              # check once per second
 #            self._updatetext('=')
         else:
-            self.log_st2.config(text='Process completed in %3d seconds' %elapsedtime)
+            self.log_st2.config(text='Process completed in %s' %elapsed)
             self._updatetext('\nprocess done\n')
             
             

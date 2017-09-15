@@ -124,7 +124,7 @@ class OrgPhotosGUI(Frame):
                 self.d['file_idx'] = 0
                 self.d['msg'] = []
 #                self.q = queue.Queue()
-            op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d)
+            op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d, gui=True)
             #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
             self.pstart = time.time()
             if self.process:

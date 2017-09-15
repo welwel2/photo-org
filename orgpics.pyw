@@ -9,7 +9,7 @@ data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0}
 class OrgPics:
     organize = True
     fhashs = []
-    def __init__(self, input_f, output_f='', redirect = False, queue=None, data=data):
+    def __init__(self, input_f, output_f='', redirect = False, queue=None, data=data, gui=False):
         self.starttime = time.time()
         self.input_f = input_f
         print('input %s, output %s, redirect %s, queue %s, data %s' %(input_f, output_f, redirect, queue, data))
@@ -17,6 +17,7 @@ class OrgPics:
         self.redirect = redirect
         self.queue = queue
         self.data = data
+        self.gui = gui
         
         if output_f == '':
             self.organize = False
@@ -54,11 +55,10 @@ class OrgPics:
     def prnt(self, msg):
        if self.queue:
            self.queue.put(msg)
-       elif self.data:
-           if redirect:
-               self.data['msg'].append(msg)
-           else:
-               print(msg)
+       elif self.gui:
+           self.data['msg'].append(msg)
+       else:
+           print(msg)
     
     def rm_empty_folders(self, rmlist):
         # remove empty folders

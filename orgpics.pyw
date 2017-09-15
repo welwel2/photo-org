@@ -5,13 +5,14 @@ from PIL import Image
 import time
 from multiprocessing import *
 from socket_stream_redirect0 import redirectOut        # connect my sys.stdout to socket
-
+data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0}
 class OrgPics:
     organize = True
     fhashs = []
-    def __init__(self, input_f, output_f='', redirect = False, queue=None, data=None):
+    def __init__(self, input_f, output_f='', redirect = False, queue=None, data=data):
         self.starttime = time.time()
         self.input_f = input_f
+        print('input %s, output %s, redirect %s, queue %s, data %s' %(input_f, output_f, redirect, queue, data))
         self.output_f = output_f
         self.redirect = redirect
         self.queue = queue
@@ -46,20 +47,18 @@ class OrgPics:
             if not os.path.getsize(dirname):
                 rmlist.append(dirname)
         self.rm_empty_folders(rmlist)
-        self.callmulti_process3(flist)
+        if flist:
+            self.callmulti_process3(flist)
         self.prnt('%d files processed in %d seconds\n'%(file_counter, time.time()- self.starttime))
            
     def prnt(self, msg):
        if self.queue:
            self.queue.put(msg)
        elif self.data:
-           if 'msg' in self.data:
+           if redirect:
                self.data['msg'].append(msg)
-#               print (msg)
            else:
-               self.data['msg'] = [msg]
-       else:
-           print(msg)
+               print(msg)
     
     def rm_empty_folders(self, rmlist):
         # remove empty folders
@@ -197,5 +196,6 @@ if __name__ == '__main__':
         op = OrgPics(input_f=sys.argv[1], redirect=redirect)
     else:
         op = OrgPics(input_f=default_path, redirect=redirect)
+    if not redirect:
         op.run()
         

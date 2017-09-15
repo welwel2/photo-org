@@ -3372,6 +3372,8 @@
             <F N="/Python35/Lib/test/leakers/README.txt"/>
             <F N="/Python35/Lib/site-packages/atlas-0.27.0-py3.5.egg-info/requires.txt"/>
             <F N="/Python35/Tools/pynche/X/rgb.txt"/>
+            <F N="run.bat"/>
+            <F N="rung.bat"/>
             <F N="/Python35/Lib/site-packages/scipy/spatial/tests/data/selfdual-4d-polytope.txt"/>
             <F N="/Python35/include/setobject.h"/>
             <F N="/Python35/Lib/test/cjkencodings/shift_jis-utf8.txt"/>

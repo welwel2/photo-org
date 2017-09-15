@@ -70,8 +70,9 @@ class OrgPhotosGUI(Frame):
             elif 'msg' in self.d:
                 message = self.d['msg']
                 if(message):
+#                    print(message)
                     self._updatetext(message)
-                    self.d['msg'] = ['']
+                    self.d['msg'] = []
         except:                            # raises socket.error if not ready
             self._updatetext('e')
         self.progbar.config(maximum= self.d['files'], value=self.d['file_idx'], length=100)
@@ -121,6 +122,7 @@ class OrgPhotosGUI(Frame):
                 self.d['caller'] = 'gui'
                 self.d['files'] = 0
                 self.d['file_idx'] = 0
+                self.d['msg'] = []
 #                self.q = queue.Queue()
             op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d)
             #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
@@ -149,10 +151,11 @@ class OrgPhotosGUI(Frame):
                 self._updatetext('%s folder is %s\n'%(name, folder))
         if self.source_folder == self.destination_folder:
             self._updatetext('Source and destination folders cannot be the same\n')
-            return False
+            return False 
         return True    
         
     def _updatetext(self, msg):
+        if isinstance(msg,list):  msg = ''.join(l for l in msg)
         self.log_t.configure(state='normal')
         self.log_t.insert('end', msg)
         self.log_t.see('end')
@@ -200,7 +203,8 @@ class OrgPhotosGUI(Frame):
         dest_row.pack(side=TOP, fill=X)
         
         # Build Message for logging
-        self.log_t = ScrolledText(self, relief="ridge", bg='white', state='disabled')
+        self.log_t = ScrolledText(self, relief="ridge", bg='white', fg='blue',
+                                  state='disabled', font=('courier', 8, 'normal'))
         self.log_t.pack(side=TOP, fill=BOTH, expand=Y)
         
         # Build status bar for logging

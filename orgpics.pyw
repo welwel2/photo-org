@@ -55,6 +55,7 @@ class OrgPics:
        elif self.data:
            if 'msg' in self.data:
                self.data['msg'].append(msg)
+#               print (msg)
            else:
                self.data['msg'] = [msg]
        else:

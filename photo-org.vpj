@@ -3329,6 +3329,7 @@
             <F N="photo-org.vpj"/>
             <F N="photo-org.vpw"/>
             <F N="photo-org.vpwhist"/>
+            <F N="push.bat"/>
             <F N="/Python35/include/py_curses.h"/>
             <F N="/Python35/include/pyarena.h"/>
             <F N="/Python35/include/pyatomic.h"/>

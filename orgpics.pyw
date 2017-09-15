@@ -67,14 +67,18 @@ class OrgPics:
     def callmulti_process3(self, flist):
         MAX_POOL = cpu_count() * 2
         files = len(flist)
+        self.data['files'] = files
         if files < MAX_POOL:
             MAX_POOL = files
+        self.data['pool_size'] = MAX_POOL
         self.prnt('Pool size is %d\n' %MAX_POOL)
         with Pool(MAX_POOL) as p:
             
             results = [p.apply_async(self.processfile, (f,), callback=self.prnt) for f in flist]
-            for r in results:
+            for i, r in enumerate(results):
                 r.wait()
+                self.data['file_idx'] = i
+                
 
     def callmulti_process2(self, flist):
         MAX_POOL = cpu_count() * 2

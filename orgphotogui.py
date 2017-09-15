@@ -2,6 +2,7 @@ import sys
 from tkinter import *
 from tkinter.messagebox import *
 from tkinter.filedialog import *
+import tkinter.ttk as ttk
 from socket import *                         # including socket.error 
 from tkinter.scrolledtext import ScrolledText
 from launchmodes import PortableLauncher
@@ -73,6 +74,7 @@ class OrgPhotosGUI(Frame):
                     self.d['msg'] = ['']
         except:                            # raises socket.error if not ready
             self._updatetext('e')
+        self.progbar.config(maximum= self.d['files'], value=self.d['file_idx'], length=100)
         self.log_st2.config(text='Process running %s' %elapsed)
         if self.p.is_alive():
             self.after(1000, self.checkdata)              # check once per second
@@ -117,6 +119,8 @@ class OrgPhotosGUI(Frame):
             else:
                 self.d = dict()
                 self.d['caller'] = 'gui'
+                self.d['files'] = 0
+                self.d['file_idx'] = 0
 #                self.q = queue.Queue()
             op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d)
             #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
@@ -205,6 +209,8 @@ class OrgPhotosGUI(Frame):
         self.log_st1.pack(side=LEFT)
         self.log_st2 = Label(b_frame, relief="sunken", bg='blue', width=50, fg='white')
         self.log_st2.pack(side=LEFT, fill=X,expand=Y)
+        self.progbar = ttk.Progressbar(b_frame, orient='horizontal', mode='determinate')
+        self.progbar.pack(side=LEFT, fill=X, expand=Y)
         self.log_st3 = Label(b_frame, relief="ridge", bg='purple', width=25, fg='white')
         self.log_st3.pack(side=LEFT)
         b_frame.pack(side=BOTTOM, fill=X)

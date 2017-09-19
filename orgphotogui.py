@@ -22,7 +22,6 @@ class OrgPhotosGUI(Frame):
     destination_folder = 'NA'
     sockets = False
     process = False
-    procs = 0
     
     def __init__(self, parent=None):
         Frame.__init__(self, parent)
@@ -77,8 +76,7 @@ class OrgPhotosGUI(Frame):
         except:                            # raises socket.error if not ready
             self._updatetext('e')
         self.progbar.config(maximum= self.d['files'], value=self.d['file_idx'], length=100)
-        self.log_st2.config(text='Process running %s, processed %s files out of %s. Pool size %s' 
-                            %(elapsed, self.d['file_idx'], self.d['files'], self.d['pool_size']))
+        self.log_st2.config(text='Process running %s' %elapsed)
         if self.p.is_alive():
             self.after(1000, self.checkdata)              # check once per second
 #            self._updatetext('=')
@@ -125,8 +123,6 @@ class OrgPhotosGUI(Frame):
                 self.d['files'] = 0
                 self.d['file_idx'] = 0
                 self.d['msg'] = []
-                self.d['procs'] = self.procs
-                self.d['pool_size'] = 0
 #                self.q = queue.Queue()
             op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d, gui=True)
             #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
@@ -155,19 +151,9 @@ class OrgPhotosGUI(Frame):
                 self._updatetext('%s folder is %s\n'%(name, folder))
         if self.source_folder == self.destination_folder:
             self._updatetext('Source and destination folders cannot be the same\n')
-            return False
+            return False 
         return True    
-    
-    def _validate_opt1(self, p, b):
-        #print('proposed %s, current %s' %(p, b))
-        if p.isdigit() and int(p) > 0 and int(p) < 100:
-            self.procs = int(p)
-            return True
-        elif p == '':
-            self.procs = 0
-            return True
-        return False
-           
+        
     def _updatetext(self, msg):
         if isinstance(msg,list):  msg = ''.join(l for l in msg)
         self.log_t.configure(state='normal')
@@ -215,15 +201,6 @@ class OrgPhotosGUI(Frame):
         self.dest_l = Entry(dest_row, relief="ridge", justify=LEFT)
         self.dest_l.pack(side= LEFT, fill=X, expand=YES)
         dest_row.pack(side=TOP, fill=X)
-        
-        # build option section
-        opt_f = Frame(self)
-        opt1_l = Label(opt_f, text="Enter a number of Processes between 1 and 100", justify=LEFT,  bg="orange")
-        opt1_l.pack(side=LEFT, fill=X)
-        vcommand = self.register(self._validate_opt1)
-        self.opt1_e = Entry(opt_f, validate='all', validatecommand=(vcommand, '%P', '%s'))
-        self.opt1_e.pack(side=LEFT, fill=X)
-        opt_f.pack(side=TOP, fill=X)
         
         # Build Message for logging
         self.log_t = ScrolledText(self, relief="ridge", bg='white', fg='blue',

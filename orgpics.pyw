@@ -45,7 +45,6 @@ class OrgPics:
                 if fname[-3:] in ('jpg', 'JPG'):
                     file_counter += 1              # increment counter
                     flist.append(os.path.join(dirname, fname))
-                    self.data['file_idx'] = self.data['files'] = file_counter
             if not os.path.getsize(dirname):
                 rmlist.append(dirname)
         self.rm_empty_folders(rmlist)
@@ -66,10 +65,7 @@ class OrgPics:
         map(os.rmdir, rmlist)
         
     def callmulti_process3(self, flist):
-        if self.data['procs']:
-            MAX_POOL = self.data['procs']
-        else:
-            MAX_POOL = cpu_count() * 2
+        MAX_POOL = cpu_count() * 2
         files = len(flist)
         self.data['files'] = files
         if files < MAX_POOL:

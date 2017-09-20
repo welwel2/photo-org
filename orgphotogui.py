@@ -23,6 +23,8 @@ class OrgPhotosGUI(Frame):
     sockets = False
     process = False
     procs = 0
+    idx = 1.0
+    tag = 0
     
     def __init__(self, parent=None):
         Frame.__init__(self, parent)
@@ -77,7 +79,7 @@ class OrgPhotosGUI(Frame):
         except:                            # raises socket.error if not ready
             self._updatetext('e')
         self.progbar.config(maximum= self.d['files'], value=self.d['file_idx'], length=100)
-        self.log_st2.config(text='Process running %s, processed %s files out of %s. Pool size %s' 
+        self.log_st2.config(text='Running %s, %s files processed out of %s. Pool %s' 
                             %(elapsed, self.d['file_idx'], self.d['files'], self.d['pool_size']))
         if self.p.is_alive():
             self.after(1000, self.checkdata)              # check once per second
@@ -145,8 +147,11 @@ class OrgPhotosGUI(Frame):
         for name, entry in folder_list:
             folder = entry.get()
             if not os.path.isdir(folder):
-                self._updatetext('Please enter or select a valid %s folder name\n'%name)
-                return False
+                if name == 'source':
+                    self._updatetext('Please enter or select a valid %s folder name\n'%name)
+                    return False
+                else:
+                    os.mkdir(folder)
             else:
                 if name == 'source':
                     self.source_folder = folder
@@ -175,6 +180,24 @@ class OrgPhotosGUI(Frame):
         self.log_t.see('end')
         self.log_t.configure(state='disabled')
         self.update()
+        
+    def search(self, pattern):
+        self.idx = self.log_t.search(pattern, self.idx)
+        self.tag += 1
+        tag = 'patt%s'%self.tag
+        if self.idx:
+            pl = len(pattern) / 10
+            idx2 = float(self.idx) + float(pl)/10 
+            self.log_t.see(self.idx)
+            self.log_t.tag_add(tag, self.idx, str(idx2))
+            self.log_t.tag_config(tag, background='yellow')
+            self.log_st2.config(text='Found %s at index %s'%(pattern, self.idx))
+            self.idx = str(idx2)
+        else:
+            self.log_st2.config(text='Not found %s'%pattern)
+            self.idx = '1.0'
+            
+        
         
     def makewidgets(self):
         
@@ -223,6 +246,14 @@ class OrgPhotosGUI(Frame):
         vcommand = self.register(self._validate_opt1)
         self.opt1_e = Entry(opt_f, validate='all', validatecommand=(vcommand, '%P', '%s'))
         self.opt1_e.pack(side=LEFT, fill=X)
+        
+        self.srch_b = Button(opt_f,  text ='go!',  bg='green', fg='white', width=15, 
+                             command=lambda: self.search(self.srch_e.get()))
+        self.srch_b.pack(side=RIGHT, padx=15)
+        self.srch_e = Entry(opt_f)
+        self.srch_e.pack(side=RIGHT, fill=X)
+        self.srch_l = Label(opt_f, text="Search", justify=LEFT, bg='orange')
+        self.srch_l.pack(side=RIGHT, fill=X)
         opt_f.pack(side=TOP, fill=X)
         
         # Build Message for logging

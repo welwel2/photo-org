@@ -7,8 +7,6 @@ from multiprocessing import *
 from socket_stream_redirect0 import redirectOut        # connect my sys.stdout to socket
 data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0}
 class OrgPics:
-    organize = True
-    fhashs = []
     def __init__(self, input_f, output_f='', redirect = False, queue=None, data=data, gui=False):
         self.starttime = time.time()
         self.input_f = input_f
@@ -18,6 +16,9 @@ class OrgPics:
         self.queue = queue
         self.data = data
         self.gui = gui
+        self.flist = []
+        self.fhashs = []
+        self.organize = True
         
         if output_f == '':
             self.organize = False
@@ -27,32 +28,53 @@ class OrgPics:
             self.duplicates = os.path.join(output_f, 'duplicates')
             self.dateless = os.path.join(output_f, 'dateless')
                 
-        if self.organize and not os.path.exists(output_f):
-            # path does not exist, create a new folder
-            os.mkdir(output_f)
-#        self.run()
+        if self.organize:
+            self.prnt('Organize is called\n')
+            self.makedir(output_f)
         
     def __call__(self):
         self.run()
         
     def run(self):
+        self.prnt('starting orgpics process\ninput folder %s\n'%self.input_f)            
+        self.walk(first_time=True)
+        self.callmulti_process3()
+        self.prnt('%d files processed in %d seconds\n'%(self.data['files'], 
+                                                  time.time()- self.starttime))
+        for i in range(2):
+            self.walk()
+         
+    def jpegsearch(self, dirname, files):
+        for fname in files:
+            if fname[-3:] in ('jpg', 'JPG'):
+                self.flist.append(os.path.normpath(os.path.join(dirname, fname)))
+                self.data['files'] += 1
+                self.data['file_idx'] += 1
+        
+    def walk(self, first_time=False):
+        ''' Walks the input folder, and if first_time is ture, search for image
+            files and add them to flist.
+            Also remove empty folders
+        '''
         rmlist = []
         file_counter = 0
-        flist = []
-        self.prnt('starting orgpics process\ninput folder %s\n'%self.input_f)            
         for (dirname, subshere, fileshere) in os.walk(self.input_f):
-            for fname in fileshere:
-                if fname[-3:] in ('jpg', 'JPG'):
-                    file_counter += 1              # increment counter
-                    flist.append(os.path.join(dirname, fname))
-                    self.data['file_idx'] = self.data['files'] = file_counter
-            if not os.path.getsize(dirname):
+            if first_time:
+                # skip duplicates folder
+                if dirname == self.duplicates: continue
+                                           
+                # search for jpeg files and add them to flist       
+                self.jpegsearch(dirname, fileshere)
+#            else:
+#                self.prnt('dirname %s subs here %s\n'%(dirname, subshere))
+                            
+            # remove folder if empty
+            if not os.listdir(dirname):
+#                self.prnt("adding %s to remove list\n"%dirname)
                 rmlist.append(dirname)
-        self.rm_empty_folders(rmlist)
-        if flist:
-            self.callmulti_process3(flist)
-        self.prnt('%d files processed in %d seconds\n'%(file_counter, time.time()- self.starttime))
-           
+        if rmlist:
+            self.rm_empty_folders(rmlist)
+        
     def prnt(self, msg):
        if self.queue:
            self.queue.put(msg)
@@ -63,14 +85,19 @@ class OrgPics:
     
     def rm_empty_folders(self, rmlist):
         # remove empty folders
-        map(os.rmdir, rmlist)
+ #       self.prnt("removing empty folders %s\n"%rmlist)
+        #map(os.rmdir, iter(rmlist))
+        #map does not work for some reason!!
+        for d in rmlist:
+            os.rmdir(d)
         
-    def callmulti_process3(self, flist):
+    def callmulti_process3(self):
+        if not self.flist: return
         if self.data['procs']:
             MAX_POOL = self.data['procs']
         else:
             MAX_POOL = cpu_count() * 2
-        files = len(flist)
+        files = len(self.flist)
         self.data['files'] = files
         if files < MAX_POOL:
             MAX_POOL = files
@@ -78,9 +105,11 @@ class OrgPics:
         self.prnt('Pool size is %d\n' %MAX_POOL)
         with Pool(MAX_POOL) as p:
             
-            results = [p.apply_async(self.processfile, (f,), callback=self.prnt) for f in flist]
+            results = [p.apply_async(self.processfile, (f,), 
+                                     callback=self.prnt) for f in self.flist]
             for i, r in enumerate(results):
-                r.wait()
+                r.wait(1000)
+#                r.get()
                 self.data['file_idx'] = i
                 
 
@@ -117,8 +146,9 @@ class OrgPics:
         msg = 'pid:%s, processing file:%s\n'% ( os.getpid(), self.file_path)
         self.checkDuplicates()
 
-        if self.organize:
+        if self.organize and not self.isduplicate:
             # extract metadata from file
+            msg = 'Org ' + msg
             self.extractOriginalDate()
 
             # move file to new location
@@ -147,29 +177,43 @@ class OrgPics:
         month = dto.__str__()[5:7]
         day = dto.__str__()[8:10]
         
-        self.new_location = os.path.join(self.output_f, '%s-%s-%s' %(year, month, day))
+        self.new_location = os.path.normpath(os.path.join(self.output_f, year, 
+                                               '%s-%s-%s' %(year, month, day)))
  #       self.prnt ("Photo Original Date: %s-%s-%s\n" %(year, month, day))
     
     def checkDuplicates(self):
         fhash = self.hashi()
+
+        # extract dirname from file path
+        dirname = os.path.dirname(self.file_path)
         
         #check to see if we have the file already
         if fhash in self.fhashs:
             # we have a possible file duplicate since the dto exists already
             # move to duplicates folder
-            self.new_location = self.duplicates
+            self.new_location = os.path.join(self.duplicates, dirname)
         #    print ("Photo is a duplicate\n")
             self.moveFile()
-            return
+            self.isduplicate = True
         else:
+            self.isduplicate = False
             self.fhashs.append(fhash)
         
-    def moveFile(self):
-        folder = self.new_location
+    def makedir(self, folder):
+        '''
+        create a folder if it does not exist 
+        '''
         if not os.path.exists(folder):
-            # path does not exist, create a new folder
             os.mkdir(folder)
-        npl = os.path.join(folder, os.path.basename(self.file_path))
+        
+    def moveFile(self):
+        ymd_folder = self.new_location
+        y_folder = os.path.dirname(ymd_folder)
+        
+        self.makedir(y_folder) 
+        self.makedir(ymd_folder) 
+            
+        npl = os.path.join(ymd_folder, os.path.basename(self.file_path))
         
         if os.path.exists(npl):
 #            self.prnt('Photo exists in new folder, skipping..')

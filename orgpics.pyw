@@ -164,7 +164,10 @@ class OrgPics:
             # remove source file folder if empty
             dirname = os.path.dirname(self.file_path)
             if not os.listdir(dirname):
-                os.rmdir(dirname)
+                try:
+                    os.rmdir(dirname)
+                except:
+                    self.prnt('unable to remove folder %s'%dirname)
         return msg
     
     def extractOriginalDate(self):

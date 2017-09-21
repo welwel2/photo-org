@@ -25,6 +25,7 @@ class OrgPhotosGUI(Frame):
     procs = 0
     idx = 1.0
     tag = 0
+    p = 0
     
     def __init__(self, parent=None):
         Frame.__init__(self, parent)
@@ -63,8 +64,23 @@ class OrgPhotosGUI(Frame):
         
     def checkdata(self):
         # check data from spawned non gui program
-#        while(self.p.is_alive()):
+        msg = 'Process not started yet'
         elapsed = self.getElapsedtime(self.pstart)
+        step1_msg = 'Running %s, %s jpeg files found so far' %(elapsed, 
+                                                               self.d['files']) 
+        step2_msg = 'Running %s, %s files processed out of %s. Pool %s'%(elapsed, 
+                      self.d['file_idx'], self.d['files'], self.d['pool_size'])
+                    
+        if self.d['step'] == 1:
+            msg = step1_msg
+            self.progbar.config(mode='indeterminate', value=self.d['file_idx'], length=100)
+            
+        else:
+            msg = step2_msg
+            self.progbar.config(maximum= self.d['files'], mode='determinate',
+                                value=self.d['file_idx'], length=100)
+        self.log_st2.config(text=msg)
+            
         try:
             if self.sockets:
                 message = self.conn.recv(1024)            # don't block for input
@@ -78,21 +94,20 @@ class OrgPhotosGUI(Frame):
                     self.d['msg'] = []
         except:                            # raises socket.error if not ready
             self._updatetext('e')
-        self.progbar.config(maximum= self.d['files'], value=self.d['file_idx'], length=100)
-        self.log_st2.config(text='Running %s, %s files processed out of %s. Pool %s' 
-                            %(elapsed, self.d['file_idx'], self.d['files'], self.d['pool_size']))
         if self.p.is_alive():
             self.after(1000, self.checkdata)              # check once per second
 #            self._updatetext('=')
         else:
-            self.log_st2.config(text='Process completed in %s' %elapsed)
-            self._updatetext('\nprocess done\n')
+            self.p.join()
+            self.log_st2.config(text='Thread completed in %s. %s files processed' 
+                                %(elapsed, self.d['files']))
+            self._updatetext('\nThread done\n')
             
             
     def get_folder(self, src_dest):
         folder_path = askdirectory()
         if not folder_path: return
-        self._updatetext('set entry folder path %s\n' %folder_path)
+        self._updatetext('%s folder path %s\n' %(src_dest, folder_path))
         if src_dest == 'src':
             self.source_l.insert(0,'%s'%folder_path)
             self.source_l.config(bg='green', fg='white')
@@ -124,11 +139,12 @@ class OrgPhotosGUI(Frame):
             else:
                 self.d = dict()
                 self.d['caller'] = 'gui'
-                self.d['files'] = 0
                 self.d['file_idx'] = 0
                 self.d['msg'] = []
                 self.d['procs'] = self.procs
                 self.d['pool_size'] = 0
+                self.d['step'] = 0
+                self.d['files'] = 0
 #                self.q = queue.Queue()
             op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d, gui=True)
             #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
@@ -146,9 +162,9 @@ class OrgPhotosGUI(Frame):
             folder_list.pop(1)
         for name, entry in folder_list:
             folder = entry.get()
-            if not os.path.isdir(folder):
-                if name == 'source':
-                    self._updatetext('Please enter or select a valid %s folder name\n'%name)
+            if not os.path.isdir(folder) or folder == 'NA':
+                if name == 'source' or folder in ['', 'NA']:
+                    self._updatetext('%s is not a valid folder name\nPlease enter or select a valid %s folder name\n'%(folder,name))
                     return False
                 else:
                     os.mkdir(folder)
@@ -161,6 +177,10 @@ class OrgPhotosGUI(Frame):
         if self.source_folder == self.destination_folder:
             self._updatetext('Source and destination folders cannot be the same\n')
             return False
+        if self.p and self.p.is_alive():
+            self._updatetext('Process is already running...\n')
+            return False
+            
         return True    
     
     def _validate_opt1(self, p, b):
@@ -223,9 +243,9 @@ class OrgPhotosGUI(Frame):
         source_button = Button(source_row, text="select",
                                bg='green', width=15, fg='white',
                                command=lambda: self.get_folder('src'))
-        source_button.pack(side=RIGHT, padx=15)
+        source_button.pack(side=RIGHT)
         self.source_l = Entry(source_row, relief="ridge", justify=LEFT)
-        self.source_l.pack(side= LEFT, fill=X, expand=YES)
+        self.source_l.pack(side= LEFT, fill=X, expand=YES, padx=15)
         source_row.pack(side=TOP, fill=X)
 
         dest_row = Frame(self)
@@ -234,25 +254,26 @@ class OrgPhotosGUI(Frame):
         dest_button = Button(dest_row, text="select",
                              bg='green', width=15, fg='white',
                              command=lambda: self.get_folder('dest'))
-        dest_button.pack(side=RIGHT, padx=15)
+        dest_button.pack(side=RIGHT)
         self.dest_l = Entry(dest_row, relief="ridge", justify=LEFT)
-        self.dest_l.pack(side= LEFT, fill=X, expand=YES)
+        self.dest_l.pack(side= LEFT, fill=X, expand=YES, padx=15)
         dest_row.pack(side=TOP, fill=X)
         
         # build option section
         opt_f = Frame(self)
-        opt1_l = Label(opt_f, text="Enter a number of Processes between 1 and 100", justify=LEFT,  bg="orange")
+        opt1_l = Label(opt_f, text="Processes # [1 - 99]", width=20, justify=LEFT,  bg="orange")
         opt1_l.pack(side=LEFT, fill=X)
         vcommand = self.register(self._validate_opt1)
-        self.opt1_e = Entry(opt_f, validate='all', validatecommand=(vcommand, '%P', '%s'))
-        self.opt1_e.pack(side=LEFT, fill=X)
+        self.opt1_e = Entry(opt_f, validate='all', width=3,
+                            validatecommand=(vcommand, '%P', '%s'))
+        self.opt1_e.pack(side=LEFT, fill=X, padx=15)
         
         self.srch_b = Button(opt_f,  text ='go!',  bg='green', fg='white', width=15, 
                              command=lambda: self.search(self.srch_e.get()))
-        self.srch_b.pack(side=RIGHT, padx=15)
+        self.srch_b.pack(side=RIGHT)
         self.srch_e = Entry(opt_f)
-        self.srch_e.pack(side=RIGHT, fill=X)
-        self.srch_l = Label(opt_f, text="Search", justify=LEFT, bg='orange')
+        self.srch_e.pack(side=RIGHT, fill=X, padx=15)
+        self.srch_l = Label(opt_f, text="Search Log", justify=LEFT, bg='orange')
         self.srch_l.pack(side=RIGHT, fill=X)
         opt_f.pack(side=TOP, fill=X)
         
@@ -263,13 +284,13 @@ class OrgPhotosGUI(Frame):
         
         # Build status bar for logging
         b_frame = Frame(self, bg='red')
-        self.log_st1 = Label(b_frame, relief="ridge", bg='purple', width=25, fg='white')
+        self.log_st1 = Label(b_frame, relief="ridge", bg='purple', width=24, fg='white')
         self.log_st1.pack(side=LEFT)
-        self.log_st2 = Label(b_frame, relief="sunken", bg='blue', width=50, fg='white')
+        self.log_st2 = Label(b_frame, relief="sunken", bg='blue', width=55, fg='white')
         self.log_st2.pack(side=LEFT, fill=X,expand=Y)
         self.progbar = ttk.Progressbar(b_frame, orient='horizontal', mode='determinate')
         self.progbar.pack(side=LEFT, fill=X, expand=Y)
-        self.log_st3 = Label(b_frame, relief="ridge", bg='purple', width=25, fg='white')
+        self.log_st3 = Label(b_frame, relief="ridge", bg='purple', width=20, fg='white')
         self.log_st3.pack(side=LEFT)
         b_frame.pack(side=BOTTOM, fill=X)
         

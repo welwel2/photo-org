@@ -5,7 +5,7 @@ from PIL import Image
 import time
 from multiprocessing import *
 from socket_stream_redirect0 import redirectOut        # connect my sys.stdout to socket
-data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0}
+data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0, 'procs':0}
 class OrgPics:
     def __init__(self, input_f, output_f='', redirect = False, queue=None, data=data, gui=False):
         self.starttime = time.time()
@@ -16,7 +16,6 @@ class OrgPics:
         self.queue = queue
         self.data = data
         self.gui = gui
-        self.flist = []
         self.fhashs = []
         self.organize = True
         
@@ -36,44 +35,46 @@ class OrgPics:
         self.run()
         
     def run(self):
-        self.prnt('starting orgpics process\ninput folder %s\n'%self.input_f)            
-        self.walk(first_time=True)
-        self.callmulti_process3()
+        self.prnt('starting orgpics process\nInput folder %s\nOutput folder %s\n'
+                  %(self.input_f, self.output_f))
+        files = 0
+        while(True):
+            self.walk(first_time=True)
+            self.callmulti_process3()
+            files += self.data['files']
+            if (self.flist == [] and self.organize) or (self.rmlist == [] and not self.organize):
+                break
+        self.data['files'] = files
         self.prnt('%d files processed in %d seconds\n'%(self.data['files'], 
                                                   time.time()- self.starttime))
-        for i in range(2):
-            self.walk()
-         
-    def jpegsearch(self, dirname, files):
-        for fname in files:
-            if fname[-3:] in ('jpg', 'JPG'):
-                self.flist.append(os.path.normpath(os.path.join(dirname, fname)))
-                self.data['files'] += 1
-                self.data['file_idx'] += 1
-        
     def walk(self, first_time=False):
         ''' Walks the input folder, and if first_time is ture, search for image
             files and add them to flist.
             Also remove empty folders
         '''
-        rmlist = []
-        file_counter = 0
+        def jpegsearch(dirname, files):
+            for fname in files:
+                if fname[-3:] in ('jpg', 'JPG'):
+                    self.flist.append(os.path.normpath(os.path.join(dirname, fname)))
+                    self.data['files'] += 1
+        self.rmlist = []
+        self.flist = []
+        self.data['step'] = 1
+        self.data['files'] = 0
         for (dirname, subshere, fileshere) in os.walk(self.input_f):
             if first_time:
                 # skip duplicates folder
                 if dirname == self.duplicates: continue
                                            
                 # search for jpeg files and add them to flist       
-                self.jpegsearch(dirname, fileshere)
-#            else:
-#                self.prnt('dirname %s subs here %s\n'%(dirname, subshere))
+                jpegsearch(dirname, fileshere)
                             
             # remove folder if empty
             if not os.listdir(dirname):
-#                self.prnt("adding %s to remove list\n"%dirname)
-                rmlist.append(dirname)
-        if rmlist:
-            self.rm_empty_folders(rmlist)
+                self.rmlist.append(dirname)
+        if self.rmlist:
+            self.rm_empty_folders()
+        
         
     def prnt(self, msg):
        if self.queue:
@@ -81,15 +82,20 @@ class OrgPics:
        elif self.gui:
            self.data['msg'].append(msg)
        else:
+           msg = msg[0:-1]
            print(msg)
     
-    def rm_empty_folders(self, rmlist):
+    def rm_empty_folders(self):
         # remove empty folders
- #       self.prnt("removing empty folders %s\n"%rmlist)
+        self.prnt("removing empty folders %s\n"%self.rmlist)
         #map(os.rmdir, iter(rmlist))
         #map does not work for some reason!!
-        for d in rmlist:
-            os.rmdir(d)
+        for d in self.rmlist:
+            try:
+                os.rmdir(d)
+            except:
+                self.prnt('unable to remove folder %s\n'%d)
+                self.rmlist.remove(d)
         
     def callmulti_process3(self):
         if not self.flist: return
@@ -102,6 +108,7 @@ class OrgPics:
         if files < MAX_POOL:
             MAX_POOL = files
         self.data['pool_size'] = MAX_POOL
+        self.data['step'] = 2
         self.prnt('Pool size is %d\n' %MAX_POOL)
         with Pool(MAX_POOL) as p:
             
@@ -153,6 +160,11 @@ class OrgPics:
 
             # move file to new location
             self.moveFile()
+            
+            # remove source file folder if empty
+            dirname = os.path.dirname(self.file_path)
+            if not os.listdir(dirname):
+                os.rmdir(dirname)
         return msg
     
     def extractOriginalDate(self):

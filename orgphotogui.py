@@ -3,6 +3,7 @@ from tkinter import *
 from tkinter.messagebox import *
 from tkinter.filedialog import *
 import tkinter.ttk as ttk
+import tkinter.tix as tix
 from socket import *                         # including socket.error 
 from tkinter.scrolledtext import ScrolledText
 from launchmodes import PortableLauncher
@@ -25,10 +26,15 @@ class OrgPhotosGUI(Frame):
     procs = 0
     idx = 1.0
     tag = 0
+    color = 0
+    pattern = -1
     p = 0
+    line_number = 0
     
     def __init__(self, parent=None):
         Frame.__init__(self, parent)
+        parent.bind('<F3>', self.onF3)
+        
         self.pack(expand=YES, fill=BOTH)
         self.starttime = time.time()
         self.makewidgets()
@@ -77,8 +83,10 @@ class OrgPhotosGUI(Frame):
             
         else:
             msg = step2_msg
-            self.progbar.config(maximum= self.d['files'], mode='determinate',
-                                value=self.d['file_idx'], length=100)
+            if self.d['files'] >= self.d['file_idx']:
+                self.progbar.config(maximum= self.d['files'], mode='determinate',
+                                    value=self.d['file_idx'], length=100)
+                self.meter.config(value= self.d['file_idx']/self.d['files'])
         self.log_st2.config(text=msg)
             
         try:
@@ -184,7 +192,8 @@ class OrgPhotosGUI(Frame):
         return True    
     
     def _validate_opt1(self, p, b):
-        #print('proposed %s, current %s' %(p, b))
+        ''' only accept a number between 1 and 99 in the procs entry field '''
+        
         if p.isdigit() and int(p) > 0 and int(p) < 100:
             self.procs = int(p)
             return True
@@ -194,23 +203,66 @@ class OrgPhotosGUI(Frame):
         return False
            
     def _updatetext(self, msg):
+        ''' diplay text on the log area '''
+        # insert line number
+        
+        
         if isinstance(msg,list):  msg = ''.join(l for l in msg)
+        # retreive current location
+        ln_idx = 'end'
+        line, char = self.log_t.index('end').split('.')
+        if int(char) != 0:
+            l = int(line) + 1
+            print('advance')
+        else:
+            l = int(line)
+        if msg[-1] == '\n':
+            msg = msg[:-1]
+        msglist = msg.split('\n')
         self.log_t.configure(state='normal')
-        self.log_t.insert('end', msg)
+        for m in msglist:
+            m = m + '\n'
+            self.line_number += 1
+            ln_idx = '%d.0'%l
+            ln_idx_start = '%d.0'%(l-1)
+            ln_idx_end = '%d.9'%(l-1)
+            log_idx_start = '%d.11'%l
+#            print(self.line_number, ln_idx, ln_idx_end, log_idx_start)
+            self.log_t.insert(ln_idx,'%7d  '%self.line_number)
+            self.log_t.insert(log_idx_start, m)
+            self.log_t.tag_add('ln', ln_idx_start, ln_idx_end)
+            self.log_t.tag_config('ln', background='gold')
+#            self.log_t.tag_add('log', log_idx_start )
+#            self.log_t.insert('end' '\n')
+            l += 1
         self.log_t.see('end')
         self.log_t.configure(state='disabled')
         self.update()
         
     def search(self, pattern):
+        ''' search for a pattern in the log area 
+            Assign a new tag to 
+        '''
+        colors = ['yellow', 'cyan', 'green', 'orange', 'magenta', 'pink',
+                   'sky blue', 'floral white', 'peach puff', 'gold', 'snow2',
+                  'khaki'
+                  ]
         self.idx = self.log_t.search(pattern, self.idx)
-        self.tag += 1
-        tag = 'patt%s'%self.tag
         if self.idx:
-            pl = len(pattern) / 10
-            idx2 = float(self.idx) + float(pl)/10 
+            # create a new tag if it is a new search
+            if (pattern != self.pattern): 
+                self.pattern = pattern
+                self.color = self.tag % len(colors) # rotate colors in colors list
+                self.tag += 1
+            tag = 'patt%s'%self.tag
+            # exctract line number and position from self.idx
+            l, pos = self.idx.split('.')
+            pl = len(pattern) # pattern length
+            new_pos = int(pos) + pl
             self.log_t.see(self.idx)
-            self.log_t.tag_add(tag, self.idx, str(idx2))
-            self.log_t.tag_config(tag, background='yellow')
+            idx2 = '%s.%s'%(l, new_pos)
+            self.log_t.tag_add(tag, self.idx, idx2)
+            self.log_t.tag_config(tag, background=colors[self.color])
             self.log_st2.config(text='Found %s at index %s'%(pattern, self.idx))
             self.idx = str(idx2)
         else:
@@ -218,6 +270,11 @@ class OrgPhotosGUI(Frame):
             self.idx = '1.0'
             
         
+    def onEnter(self, event):
+        self.search(self.srch_e.get())
+        
+    def onF3(self, event):
+        self.search(self.srch_e.get())
         
     def makewidgets(self):
         
@@ -231,6 +288,10 @@ class OrgPhotosGUI(Frame):
         c_button.pack(side=LEFT)
         mid_label = Label(b_frame, text=self.msg3, bg='orange', font=('courier', 14))
         mid_label.pack(side=LEFT, expand=YES, fill=X)
+        
+        self.meter = tix.Meter(b_frame)
+        self.meter.pack(side=LEFT, expand=YES, fill=X)
+        
         quit_button = Button(b_frame, text='Quit', width=20, fg='white', bg='red',
                              command=root.quit)
         quit_button.pack(side=RIGHT)
@@ -271,6 +332,7 @@ class OrgPhotosGUI(Frame):
         self.srch_b = Button(opt_f,  text ='go!',  bg='green', fg='white', width=15, 
                              command=lambda: self.search(self.srch_e.get()))
         self.srch_b.pack(side=RIGHT)
+        
         self.srch_e = Entry(opt_f)
         self.srch_e.pack(side=RIGHT, fill=X, padx=15)
         self.srch_l = Label(opt_f, text="Search Log", justify=LEFT, bg='orange')
@@ -294,9 +356,14 @@ class OrgPhotosGUI(Frame):
         self.log_st3.pack(side=LEFT)
         b_frame.pack(side=BOTTOM, fill=X)
         
+        # key binding
+        self.srch_e.bind('<Return>', self.onEnter)
+#        self.srch_e.bind('<F3>'    , self.onF3)
+        
 
 if __name__ == '__main__':
-    root = Tk()
+    root = tix.Tk()
+   
     myorgphoto = OrgPhotosGUI(root)
     myorgphoto.master.title("My Org Photo")
     root.mainloop()

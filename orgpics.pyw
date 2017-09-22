@@ -38,12 +38,17 @@ class OrgPics:
         self.prnt('starting orgpics process\nInput folder %s\nOutput folder %s\n'
                   %(self.input_f, self.output_f))
         files = 0
+        loops = 0
         while(True):
             self.walk(first_time=True)
             self.callmulti_process3()
             files += self.data['files']
-            if (self.flist == [] and self.organize) or (self.rmlist == [] and not self.organize):
+            loops += 1
+            if (self.flist == [] and self.organize) or  \
+               (self.rmlist == [] and not self.organize) or \
+                loops > 3:
                 break
+           
         self.data['files'] = files
         self.prnt('%d files processed in %d seconds\n'%(self.data['files'], 
                                                   time.time()- self.starttime))

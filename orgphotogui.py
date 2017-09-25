@@ -117,9 +117,11 @@ class OrgPhotosGUI(Frame):
         if not folder_path: return
         self._updatetext('%s folder path %s\n' %(src_dest, folder_path))
         if src_dest == 'src':
+            self.source_l.delete(0, END)
             self.source_l.insert(0,'%s'%folder_path)
             self.source_l.config(bg='green', fg='white')
         else:
+            self.dest_l.delete(0, END)
             self.dest_l.insert(0,'%s'%folder_path)
             self.dest_l.config(bg='green', fg='white')
     
@@ -153,6 +155,7 @@ class OrgPhotosGUI(Frame):
                 self.d['pool_size'] = 0
                 self.d['step'] = 0
                 self.d['files'] = 0
+                self.d['copy']  = self.cpvar.get()
 #                self.q = queue.Queue()
             op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d, gui=True)
             #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
@@ -276,6 +279,13 @@ class OrgPhotosGUI(Frame):
     def onF3(self, event):
         self.search(self.srch_e.get())
         
+    def display_cb(self):
+        if self.cpvar.get():
+            msg = 'Copy mode is enabled, source files are safe'
+        else:
+            msg = 'move mode is set, source files will be moved' 
+        self.log_st2.config(text=msg)
+        
     def makewidgets(self):
         
         # Build botton buttons first to collapse last!
@@ -328,6 +338,13 @@ class OrgPhotosGUI(Frame):
         self.opt1_e = Entry(opt_f, validate='all', width=3,
                             validatecommand=(vcommand, '%P', '%s'))
         self.opt1_e.pack(side=LEFT, fill=X, padx=15)
+        
+        #copy_l = Label(opt_f, text="Copy", width=6, justify=LEFT,  bg="orange")
+        #copy_l.pack(side = LEFT, fill = X)
+        self.cpvar = IntVar()
+        copy_cb = Checkbutton(opt_f, text="Copy, Won't touch source files", 
+                              variable=self.cpvar, command=self.display_cb) 
+        copy_cb.pack(side=LEFT, fill=X, padx=5)
         
         self.srch_b = Button(opt_f,  text ='go!',  bg='green', fg='white', width=15, 
                              command=lambda: self.search(self.srch_e.get()))

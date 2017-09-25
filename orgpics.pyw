@@ -3,10 +3,12 @@ import exifread
 import hashlib
 from PIL import Image
 import time
+import shutil
 from multiprocessing import *
 from socket_stream_redirect0 import redirectOut        # connect my sys.stdout to socket
-data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0, 'procs':0}
+data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0, 'procs':0, 'copy':0}
 class OrgPics:
+    #lock = Lock()
     def __init__(self, input_f, output_f='', redirect = False, queue=None, data=data, gui=False):
         self.starttime = time.time()
         self.input_f = input_f
@@ -82,6 +84,7 @@ class OrgPics:
         
         
     def prnt(self, msg):
+       #self.lock.acquire() 
        if self.queue:
            self.queue.put(msg)
        elif self.gui:
@@ -89,7 +92,8 @@ class OrgPics:
        else:
            msg = msg[0:-1]
            print(msg)
-    
+       #self.lock.release()
+       
     def rm_empty_folders(self):
         # remove empty folders
         self.prnt("removing empty folders %s\n"%self.rmlist)
@@ -98,8 +102,8 @@ class OrgPics:
         for d in self.rmlist:
             try:
                 os.rmdir(d)
-            except:
-                self.prnt('unable to remove folder %s\n'%d)
+            except Exception as e:
+                self.prnt('Error %s unable to remove folder %s\n'%(e,d))
                 self.rmlist.remove(d)
         
     def callmulti_process3(self):
@@ -171,8 +175,8 @@ class OrgPics:
             if not os.listdir(dirname):
                 try:
                     os.rmdir(dirname)
-                except:
-                    self.prnt('unable to remove folder %s'%dirname)
+                except Exception as e:
+                    self.prnt('Error 2 %s unable to remove folder %s'%(e, dirname))
         return msg
     
     def extractOriginalDate(self):
@@ -224,7 +228,10 @@ class OrgPics:
         create a folder if it does not exist 
         '''
         if not os.path.exists(folder):
-            os.mkdir(folder)
+            try:
+                os.mkdir(folder)
+            except Exception as e:
+                self.prnt('Error %s Unable to create folder %s'%(e, folder))
         
     def moveFile(self):
         ymd_folder = self.new_location
@@ -236,9 +243,15 @@ class OrgPics:
         npl = os.path.join(ymd_folder, os.path.basename(self.file_path))
         
         if os.path.exists(npl):
-           os.remove(self.file_path) 
+            try:
+                os.remove(self.file_path) 
+            except Exception as e:
+                self.prnt('Error during remove %s'%e)
         else:
-           os.rename(self.file_path, npl)
+            try: 
+                shutil.move(self.file_path, npl)
+            except Exception as e:
+                self.prnt('Error during move %s'%e)
         
     def hashi(self):
         tf = Image.open(self.file_path)

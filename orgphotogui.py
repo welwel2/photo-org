@@ -207,7 +207,7 @@ class OrgPhotosGUI(Frame):
         # insert line number
         
         
-        if isinstance(msg,list):  msg = ''.join(l for l in msg)
+        if isinstance(msg,list):  msg = ''.join(l for l in msg)  
         # retreive current location
         ln_idx = 'end'
         line, char = self.log_t.index('end').split('.')

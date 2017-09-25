@@ -236,10 +236,9 @@ class OrgPics:
         npl = os.path.join(ymd_folder, os.path.basename(self.file_path))
         
         if os.path.exists(npl):
-#            self.prnt('Photo exists in new folder, skipping..')
-            return
-        
-        os.rename(self.file_path, npl)
+           os.remove(self.file_path) 
+        else:
+           os.rename(self.file_path, npl)
         
     def hashi(self):
         tf = Image.open(self.file_path)

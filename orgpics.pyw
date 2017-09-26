@@ -152,14 +152,12 @@ class OrgPics:
         
         # Return Exif tags
         tags = exifread.process_file(fh)
-        # print(tags)
         try:
             dto = tags['EXIF DateTimeOriginal']
         except KeyError:
             try:
                 dto = tags['Image DateTime']
             except KeyError:
-#                self.prnt('Photo has no date found')
                 self.new_location = self.dateless
                 return
                 
@@ -170,7 +168,6 @@ class OrgPics:
         
         self.new_location = os.path.normpath(os.path.join(self.output_f, year, 
                                                '%s-%s-%s' %(year, month, day)))
- #       self.prnt ("Photo Original Date: %s-%s-%s\n" %(year, month, day))
     
     def checkDuplicates(self):
         fhash = self.hashi()

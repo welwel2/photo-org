@@ -4,12 +4,9 @@ from tkinter.messagebox import *
 from tkinter.filedialog import *
 import tkinter.ttk as ttk
 import tkinter.tix as tix
-from socket import *                         # including socket.error 
 from tkinter.scrolledtext import ScrolledText
-from launchmodes import PortableLauncher
-from multiprocessing import *
 from threading import *
-import time, queue
+import time
 from orgpics import OrgPics
 
 
@@ -21,7 +18,6 @@ class OrgPhotosGUI(Frame):
     msg3 = 'Photo Organizer rev %s' %rev
     source_folder = 'NA'
     destination_folder = 'NA'
-    sockets = False
     process = False
     procs = 0
     idx = 1.0
@@ -42,13 +38,6 @@ class OrgPhotosGUI(Frame):
         self._updatetext(self.msg0)
         self.onTimer()
         
-    def _startSocket(self):
-        myport = 50008
-        self._updatetext('starting socket at port number %d\n'%myport)
-        self.sockobj = socket(AF_INET, SOCK_STREAM)       # GUI is server, script is client
-        self.sockobj.bind(('', myport))                   # config server before client
-        self.sockobj.listen(5)
-        
     def getElapsedtime(self, start):
         secsSinceEpoch = time.time()
         elapsedtime = secsSinceEpoch - start
@@ -60,6 +49,7 @@ class OrgPhotosGUI(Frame):
         timestr = 'time %d:%d:%d'%(elapsedhrs, elapsedmin, elapsedsec)
 
         return timestr
+    
     def onTimer(self):
         elapsed = self.getElapsedtime(self.starttime)
         # update status Bar
@@ -86,27 +76,25 @@ class OrgPhotosGUI(Frame):
             if self.d['files'] >= self.d['file_idx']:
                 self.progbar.config(maximum= self.d['files'], mode='determinate',
                                     value=self.d['file_idx'], length=100)
-                self.meter.config(value= self.d['file_idx']/self.d['files'])
+                self.meter.config(value= self.d['file_idx']/(self.d['files']+0.0001))
         self.log_st2.config(text=msg)
             
         try:
-            if self.sockets:
-                message = self.conn.recv(1024)            # don't block for input
-#            elif self.q and not self.q.empty():
-#                message = self.q.get()
-            elif 'msg' in self.d:
+            if 'msg' in self.d:
                 message = self.d['msg']
                 if(message):
-#                    print(message)
                     self._updatetext(message)
                     self.d['msg'] = []
-        except:                            # raises socket.error if not ready
+        except:
             self._updatetext('e')
+            
         if self.p.is_alive():
             self.after(1000, self.checkdata)              # check once per second
-#            self._updatetext('=')
         else:
             self.p.join()
+            self.progbar.config(maximum= self.d['files'], mode='determinate',
+                                value=self.d['file_idx'], length=100)
+            self.meter.config(value= 1.0)
             self.log_st2.config(text='Thread completed in %s. %s files processed' 
                                 %(elapsed, self.d['files']))
             self._updatetext('\nThread done\n')
@@ -131,40 +119,24 @@ class OrgPhotosGUI(Frame):
             task = "clean"
         else:
             task = 'organize'
+            
         if not self._validate_folder(dest=dest): return
+                                             
         self._updatetext(self.msg2)
-        if self.sockets:
-            self._startSocket()
-            self._updatetext('Spawn non GUI script\n')
-            cmd = 'orgpics.pyw %s %s -g'%(self.source_folder, self.destination_folder)
-            PortableLauncher('%s'%task, cmd)()  # spawn non-GUI script 
-    
-            self._updatetext('accepting\n')
-            self.conn, self.addr = self.sockobj.accept()                # wait for client to connect
-            self._updatetext('accepted\n')
-            self.conn.setblocking(False)                           # use nonblocking socket (False=0)
-        else:
-            if self.process:
-               self.q = Queue()
-            else:
-                self.d = dict()
-                self.d['caller'] = 'gui'
-                self.d['file_idx'] = 0
-                self.d['msg'] = []
-                self.d['procs'] = self.procs
-                self.d['pool_size'] = 0
-                self.d['step'] = 0
-                self.d['files'] = 0
-                self.d['copy']  = self.cpvar.get()
-#                self.q = queue.Queue()
-            op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d, gui=True)
-            #op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, queue=self.q)
-            self.pstart = time.time()
-            if self.process:
-                self.p = Process(target=op)
-            else:
-                self.p = Thread(target=op, name='orgpics')
-            self.p.start()
+        self.d = dict()
+        self.d['caller'] = 'gui'
+        self.d['file_idx'] = 0
+        self.d['msg'] = []
+        self.d['procs'] = self.procs
+        self.d['pool_size'] = 0
+        self.d['step'] = 0
+        self.d['files'] = 0
+        self.d['copy']  = self.cpvar.get()
+                                             
+        op = OrgPics(input_f=self.source_folder, output_f=self.destination_folder, data=self.d, gui=True)
+        self.pstart = time.time()
+        self.p = Thread(target=op, name='orgpics')
+        self.p.start()
         self.checkdata()
         
     def _validate_folder(self, src=True, dest=True):
@@ -230,7 +202,6 @@ class OrgPhotosGUI(Frame):
             ln_idx_start = '%d.0'%(l-1)
             ln_idx_end = '%d.9'%(l-1)
             log_idx_start = '%d.11'%l
-#            print(self.line_number, ln_idx, ln_idx_end, log_idx_start)
             self.log_t.insert(ln_idx,'%7d  '%self.line_number)
             self.log_t.insert(log_idx_start, m)
             self.log_t.tag_add('ln', ln_idx_start, ln_idx_end)

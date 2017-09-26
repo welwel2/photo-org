@@ -5,17 +5,14 @@ from PIL import Image
 import time
 import shutil
 from multiprocessing import *
-from socket_stream_redirect0 import redirectOut        # connect my sys.stdout to socket
 data = {'msg' : [], 'files' :0, 'pool_size':0, 'file_idx':0, 'procs':0, 'copy':0}
+
 class OrgPics:
     #lock = Lock()
-    def __init__(self, input_f, output_f='', redirect = False, queue=None, data=data, gui=False):
+    def __init__(self, input_f, output_f='', data=data, gui=False):
         self.starttime = time.time()
         self.input_f = input_f
-        print('input %s, output %s, redirect %s, queue %s, data %s' %(input_f, output_f, redirect, queue, data))
         self.output_f = output_f
-        self.redirect = redirect
-        self.queue = queue
         self.data = data
         self.gui = gui
         self.fhashs = []
@@ -39,16 +36,17 @@ class OrgPics:
     def run(self):
         self.prnt('starting orgpics process\nInput folder %s\nOutput folder %s\n'
                   %(self.input_f, self.output_f))
+        self.copy = self.data['copy']
         files = 0
         loops = 0
         while(True):
             self.walk(first_time=True)
-            self.callmulti_process3()
+            self.callmulti_process()
             files += self.data['files']
             loops += 1
             if (self.flist == [] and self.organize) or  \
                (self.rmlist == [] and not self.organize) or \
-                loops > 3:
+                loops > 3 or self.copy:
                 break
            
         self.data['files'] = files
@@ -61,7 +59,7 @@ class OrgPics:
         '''
         def jpegsearch(dirname, files):
             for fname in files:
-                if fname[-3:] in ('jpg', 'JPG'):
+                if fname[-3:] in ['jpg', 'JPG']:
                     self.flist.append(os.path.normpath(os.path.join(dirname, fname)))
                     self.data['files'] += 1
         self.rmlist = []
@@ -69,13 +67,16 @@ class OrgPics:
         self.data['step'] = 1
         self.data['files'] = 0
         for (dirname, subshere, fileshere) in os.walk(self.input_f):
-            if first_time:
-                # skip duplicates folder
-                if dirname == self.duplicates: continue
-                                           
-                # search for jpeg files and add them to flist       
-                jpegsearch(dirname, fileshere)
-                            
+            # skip duplicates folder
+            if dirname == self.duplicates: continue
+                                       
+            # search for jpeg files and add them to flist       
+            jpegsearch(dirname, fileshere)
+                        
+            # remove picasa.ini file if exists
+            if 'picasa.ini' in fileshere:
+                os.remove(os.path.join(dirname, 'picasa.ini'))
+                
             # remove folder if empty
             if not os.listdir(dirname):
                 self.rmlist.append(dirname)
@@ -85,9 +86,7 @@ class OrgPics:
         
     def prnt(self, msg):
        #self.lock.acquire() 
-       if self.queue:
-           self.queue.put(msg)
-       elif self.gui:
+       if self.gui:
            self.data['msg'].append(msg)
        else:
            msg = msg[0:-1]
@@ -97,8 +96,6 @@ class OrgPics:
     def rm_empty_folders(self):
         # remove empty folders
         self.prnt("removing empty folders %s\n"%self.rmlist)
-        #map(os.rmdir, iter(rmlist))
-        #map does not work for some reason!!
         for d in self.rmlist:
             try:
                 os.rmdir(d)
@@ -106,7 +103,7 @@ class OrgPics:
                 self.prnt('Error %s unable to remove folder %s\n'%(e,d))
                 self.rmlist.remove(d)
         
-    def callmulti_process3(self):
+    def callmulti_process(self):
         if not self.flist: return
         if self.data['procs']:
             MAX_POOL = self.data['procs']
@@ -125,38 +122,8 @@ class OrgPics:
                                      callback=self.prnt) for f in self.flist]
             for i, r in enumerate(results):
                 r.wait(1000)
-#                r.get()
                 self.data['file_idx'] = i
                 
-
-    def callmulti_process2(self, flist):
-        MAX_POOL = cpu_count() * 2
-        result = []
-        files = len(flist)
-        if files < MAX_POOL:
-            MAX_POOL = files
-        P = Pool(MAX_POOL)
-        P.map(self.processfile, flist)
-        P.close()
-        P.join()
-        
-    def callmulti_process(self, flist):
-        MAX_POOL = 16
-        lock = Lock()
-        files = len(flist)
-        while len(flist):
-            print ('number of files to process %d\n' %len(flist))
-            if len(flist) > MAX_POOL:
-                processes = MAX_POOL
-            else:
-                processes = len(flist)
-    
-            for i in range(processes):
-                print ('processes %d %d file %s' %(processes, i, flist[0]))
-                Process(target=self.processfile, args=(('run process %d' % i),
-                                                        flist[0], lock)).start()
-                flist.pop(0)
-        
     def processfile(self, file):
         self.file_path = file
         msg = 'pid:%s, processing file:%s\n'% ( os.getpid(), self.file_path)
@@ -216,7 +183,6 @@ class OrgPics:
             # we have a possible file duplicate since the dto exists already
             # move to duplicates folder
             self.new_location = os.path.join(self.duplicates, dirname)
-        #    print ("Photo is a duplicate\n")
             self.moveFile()
             self.isduplicate = True
         else:
@@ -242,16 +208,21 @@ class OrgPics:
             
         npl = os.path.join(ymd_folder, os.path.basename(self.file_path))
         
-        if os.path.exists(npl):
+        if os.path.exists(npl) and not self.copy:
             try:
                 os.remove(self.file_path) 
             except Exception as e:
                 self.prnt('Error during remove %s'%e)
         else:
-            try: 
-                shutil.move(self.file_path, npl)
+            try:
+                if self.copy:
+                    op = 'copy'
+                    shutil.copy(self.file_path, npl)
+                else:
+                    op = 'move'
+                    shutil.move(self.file_path, npl)
             except Exception as e:
-                self.prnt('Error during move %s'%e)
+                self.prnt('Error during %s %s'%(op,e))
         
     def hashi(self):
         tf = Image.open(self.file_path)
@@ -260,22 +231,14 @@ class OrgPics:
 if __name__ == '__main__':
     import sys
     args = len(sys.argv)
-    redirect = False
     default_path = r'C:\Users\juju\Pictures'
     print('sys.argv ', sys.argv, 'args ', args)
     
-    if '-g' in sys.argv[-1]:                          # link to gui only if requested
-        print('redirecting output to gui ', sys.argv)
-        redirectOut()                                # GUI must be started first as is
-        redirect = True
-        sys.argv.pop(-1)
-        
     if len(sys.argv) > 2:
-        op = OrgPics(input_f=sys.argv[1], output_f=sys.argv[2], redirect=redirect)
+        op = OrgPics(input_f=sys.argv[1], output_f=sys.argv[2])
     elif len(sys.argv) == 2:
-        op = OrgPics(input_f=sys.argv[1], redirect=redirect)
+        op = OrgPics(input_f=sys.argv[1])
     else:
-        op = OrgPics(input_f=default_path, redirect=redirect)
-    if not redirect:
-        op.run()
+        op = OrgPics(input_f=default_path)
+    op.run()
         

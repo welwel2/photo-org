@@ -86,7 +86,7 @@ class OrgPhotosGUI(Frame):
             if self.d['files'] >= self.d['file_idx']:
                 self.progbar.config(maximum= self.d['files'], mode='determinate',
                                     value=self.d['file_idx'], length=100)
-                self.meter.config(value= self.d['file_idx']/self.d['files'])
+                self.meter.config(value= self.d['file_idx']/(self.d['files']+0.0001))
         self.log_st2.config(text=msg)
             
         try:
@@ -109,6 +109,9 @@ class OrgPhotosGUI(Frame):
             self.p.join()
             self.log_st2.config(text='Thread completed in %s. %s files processed' 
                                 %(elapsed, self.d['files']))
+            self.meter.config(value= 1.0)
+            self.progbar.config(maximum= self.d['files'], mode='determinate',
+                                           value=self.d['file_idx'], length=100)
             self._updatetext('\nThread done\n')
             
             

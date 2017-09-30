@@ -73,9 +73,11 @@ class OrgPics:
             # search for jpeg files and add them to flist       
             jpegsearch(dirname, fileshere)
                         
-            # remove picasa.ini file if exists
-            if 'picasa.ini' in fileshere:
-                os.remove(os.path.join(dirname, 'picasa.ini'))
+            # remove picasa.ini and other files if exists
+            rm_files = ['.picasa.ini', 'ZbThumbnail.info', 'Thumbs.db']
+            for file in rm_files:
+                if file in fileshere:
+                    os.remove(os.path.join(dirname, file))
                 
             # remove folder if empty
             if not os.listdir(dirname):

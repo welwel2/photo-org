@@ -75,8 +75,8 @@ class OrgPics:
                         
             # remove picasa.ini and other files if exists
             rm_files = ['.picasa.ini', 'ZbThumbnail.info', 'Thumbs.db']
-            for file in rm_files:
-                if file in fileshere:
+            for file in fileshere:
+                if file in rm_files or file[-3:] in ['THM']:
                     os.remove(os.path.join(dirname, file))
                 
             # remove folder if empty
